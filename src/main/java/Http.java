@@ -94,6 +94,7 @@ public class Http {
         return new HeaderData(host, port, contentLength);
     }
 
+    //extracting host and port
     private static HostPort parseHostHeader(String header) {
         String value = header.substring("host:".length()).trim();
         String host = value;

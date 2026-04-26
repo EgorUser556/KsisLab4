@@ -6,7 +6,7 @@ import java.util.List;
 
 public class ClientHandler implements Runnable {
 
-    private static final int REMOTE_TIMEOUT = 30_000;
+    private static final int REMOTE_TIMEOUT = 10_000;
     private static final int STREAM_BUFFER_SIZE = 8192;
 
     private final Socket clientSocket;
@@ -38,7 +38,7 @@ public class ClientHandler implements Runnable {
 
             if (accessPolicy.isForbidden(requestUrl, targetHost)) {
                 writeForbiddenPage(browserOutput, requestUrl);
-                writeLog(requestUrl, 403);
+                writeLog(requestUrl, 403, "Forbidden");
                 return;
             }
 
@@ -148,14 +148,42 @@ public class ClientHandler implements Runnable {
             return;
         }
 
-        int statusCode = extractStatusCode(responseHeaders);
-        writeLog(requestUrl, statusCode);
+        ResponseStatus status = extractStatus(responseHeaders);
+        writeLog(requestUrl, status.code(), status.reason());
 
         responseOutput.write(responseHeaders);
         responseOutput.flush();
 
         pipeStream(responseInput, responseOutput);
     }
+
+    private ResponseStatus extractStatus(byte[] headerBytes) {
+        String headersText = new String(headerBytes, StandardCharsets.ISO_8859_1);
+        String[] lines = headersText.split("\r\n");
+
+        if (lines.length == 0) {
+            return new ResponseStatus(0, "Unknown");
+        }
+
+        String[] parts = lines[0].split(" ", 3);
+        if (parts.length < 2) {
+            return new ResponseStatus(0, "Unknown");
+        }
+
+        try {
+            int code = Integer.parseInt(parts[1]);
+            String reason = parts.length >= 3 ? parts[2] : "";
+            return new ResponseStatus(code, reason);
+        } catch (NumberFormatException ex) {
+            return new ResponseStatus(0, "Unknown");
+        }
+    }
+
+    private void writeLog(String url, int code, String reason) {
+        System.out.println("URL: " + url + " | Response: " + code + " " + reason);
+    }
+
+    private record ResponseStatus(int code, String reason) {}
 
     private byte[] readResponseHeaders(InputStream input) throws IOException {
         ByteArrayOutputStream headerBytes = new ByteArrayOutputStream();
@@ -226,10 +254,6 @@ public class ClientHandler implements Runnable {
 
         browserOutput.write(body);
         browserOutput.flush();
-    }
-
-    private void writeLog(String url, int code) {
-        System.out.println("URL: " + url + " | Response: " + code);
     }
 
     private void closeClientSocket() {

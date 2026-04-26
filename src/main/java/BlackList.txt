@@ -1,2 +1,0 @@
-http://live.legendy.by:8000/legendyfm
-http://example.com
